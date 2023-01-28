@@ -6,9 +6,15 @@
 
 이러한 linux 기반 system에서 요구하는 더 높은 resource나 hardware complexity는 energy consumption을 충분히 줄여주는 방향으로 설계되지 않는다.
 
-이와 다르게 사양이 더 낮은 embedded system들에서는 짧고, 측정 및 예측이 가능한 시간 내에 일련의 작업을 수행하도록 설계된다. 이런 종류의 system을 **real-time system**(실시간 시스템)이라고 한다. 이 점에서 linux는 <U>hard</U> real-time system으로 설계되지 않았기 때문에, real-time system을 목적으로 설계된 제한된 **bare-metal**(베어메탈) system과 비교할 수 없다.
+![real-time system](images/real-time_system.png)
+
+이와 다르게 사양이 더 낮은 embedded system들에서는 짧고, 측정 및 예측이 가능한 시간 내에 일련의 작업을 수행하도록 설계된다. 이런 종류의 system을 **real-time system**(실시간 시스템)이라고 한다. 이 점에서 linux는 **hard real-time** system으로 설계되지 않았기 때문에, real-time system을 목적으로 설계된 제한된 **bare-metal**(베어메탈) system과 비교할 수 없다.
+
+> hard realtime이란 수 밀리초의 deadline을 확실하게 준수해서 동작하도록 설계하는 것을 의미한다. 예를 들어 자동차나 로켓 엔진의 연소 제어 등에서 이러한 보장이 꼭 필요하다.
 
 bare-metal이란 hardware 상에 어떤 software도 설치되어 있지 않은 상태를 뜻한다. 즉, OS와 같은 기본 **abstraction**(추상화)가 없는 hardware 환경을 뜻한다. 이런 환경에서는 주로 하나의 infinite loop로 실행되는 **firmware**(펌웨어)를 작성한다.
+
+> embedded software는 hardware와 application software 사이에 위치해 있다는 의미로 firmware라고도 부른다. 경우에 따라 OS와 firmware를 합친 것을 embedded software로 부르는 경우도 있다.
 
 > 이 책에서 Embedded System은 주로 MCU 기반의 hardware architecture를 중심으로 한다.
 
