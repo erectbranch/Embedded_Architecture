@@ -21,6 +21,24 @@
   > 임베디드 시스템의 특성을 이해하고 개발 환경을 구축한다.
 
 
+</br>
+
+## 🚩 정리한 문서 목록
+
+### 📔 임베디드 기초
+
+ - [임베디드 시스템 개요](https://github.com/erectbranch/Embedded_Architecture/tree/master/ch01)
+
+   > real-time system(soft/hard), bare-metal, firmware, microcontroller 구조, embedded system의 제약, RAM, flash memory, XIP
+
+ - [C 컴파일러와 링커](https://github.com/erectbranch/Embedded_Architecture/tree/master/ch02/summary01)
+
+   > toolchain, bit pattern, assembly, cross-compilation
+
+   > C compiler: GCC, preprocessor, compiler, assembler
+
+   > Linker: symbol(.text/.rodata/.data/.bss), linker script, symbol resolution, relocation, ROF/EOF, object file format
+
 <br/>
 
 ### 1장. 임베디드 시스템: 실용주의적 접근
