@@ -1,4 +1,4 @@
-# 4 Interrupt, Boot-up Process
+# 4 Subsystem, Interrupt, Boot-up Process
 
 들어가기 앞서 ARM processor가 갖는 7가지 mode를 살펴보자.
 
@@ -14,9 +14,152 @@
 | Undefined | instruction이 정의되지 않은 경우 발생하는 fault를 처리하는 mode | 11011b |
 | System | User mode와 SVC mode의 조합으로, User mode의 제약을 없애고 SVC mode의 기능을 추가한 mode | 11111b |
 
+또한 ARM Cortex-M7은 다음과 같은 data type을 지원한다.
+
+- 32bit words
+
+- 16bit halfwords
+
+- 8bit bytes
+
+- FPU(Floating-Point Unit)가 구현되어 있을 경우
+
+  - 32bit single-precision floating point numbers
+
+  - 64bit double-precision floating point numbers
+
+또한 모든 data는 little-endian으로 처리한다.
+
+![little-endian](images/little_endian.png)
+
+- memory에 있는 Address A ~ A+3까지의 data를 읽어오는 경우, 다음 순서로 가져오게 된다.(register가 4byte 크기이므로, memory에서 4byte씩 읽어온다.)
+
+  - little-endian: A+3, A+2, A+1, A
+
+  - big-endian: A, A+1, A+2, A+3
+
 ---
 
-## 4.1 Interrupt
+## 4.1 programmer model
+
+processor mode와 privilege level(특권 레벨)이 무엇인지 알아보자.
+
+**processor mode**: processor가 현재 수행하고 있는 작업의 종류를 나타낸다.
+
+- thread mode: 일반 application이 동작되는 mode이다. processor가 reset된 후에는 thread mode로 시작한다.
+
+- handler mode: exception이 발생했을 때, exception handler가 동작되는 mode이다.(모든 exception 처리가 끝나면 thread mode로 돌아간다.)
+
+**privilege level**: processor가 현재 수행하고 있는 작업의 권한을 나타낸다.
+
+- privileged: processor가 privileged instruction을 수행할 수 있는 권한을 가진다. 다시 말해 아무런 제약 없이 모든 instruction을 수행할 수 있으며, 모든 resource에 접근할 수 있다.
+
+- unprivileged: privileged instruction을 수행할 수 없으며, 수행하려고 하면 processor는 exception을 발생시킨다.(일반 instruction만 수행할 수 있다.)
+
+  - 예를 들어 범용 register는 모든 instruction으로 register에 접근할 수 있지만, system register는 MSR, MRS와 같은 privileged instruction으로만 접근할 수 있다.
+
+  - 이때 privileged instruction을 수행하려고 할때 발생하는 exception은 **memory abort** type이다.
+
+이런 구분은 OS를 사용하는 program에서 hardware 접근 권한을 관리하기 위해 만든 기능이다. 따라서 OS를 사용하지 않거나 작은 RTOS를 사용하는 system에서는 이런 구분 없이 privileged level에서 동작하게 된다.
+
+---
+
+## 4.2 core register
+
+다음은 ARM cortex-M7의 register file이다. core에 위치해서 매우 빠르게 접근할 수 있다.
+
+![core register](images/core_register.png)
+
+- R0 ~ R12: 범용(**general-purpose**) register로, data나 address와 같은 정보를 저장하는 용도로 사용한다.
+
+  - R0~R7을 low register, R8~R12를 high register라고 부른다.
+
+  - low register는 ARM instruction(32bit), Thumb instruction(16bit) 모두 접근할 수 있지만, high register는 ARM instruction(32bit)만 접근할 수 있다.
+
+- R13(**SP**): **stack pointer**로, stack의 top을 가리킨다. Cortex-M7 processor 두 가지 stack을 가지고 있다.
+
+  -  Main Stack Pointer(**MSP**)와 Process Stack Pointer(**PSP**)가 있다. mode에 따라 사용할 수 있는 stack이 다르다. 
+  
+  - thread mode: main stack과 process stack 중 하나를 사용한다.
+
+  - handler mode: main stack만 사용한다.
+
+- R14(**LR**): **link** register로, function call 시 return address를 저장한다.
+
+- R15(**PC**): program counter(PC)로, fetch를 해서 가져온 instruction의 address를 가리킨다.
+
+나머지 register는 문단을 나눠서 설명한다.
+
+---
+
+### 4.2.1 PSR(Program Status Register)
+
+**PSR**(Program Status Register)은 말 그대로 processor의 state를 나타내는 register이다. PSR은 32bit로 구성되어 있으며, 세 개의 register 조합으로 구성되어 있다.
+
+![PSR](images/PSR.png)
+
+- APSR(Application Program Status Register)
+
+- IPSR(Interrupt Program Status Register)
+
+- EPSR(Exception Program Status Register)
+
+이 register의 모든 bit들은 서로 겹치지 않게 allocate되어 있다. 개별적으로도 접근할 수 있으며, 동시에 여러 register 정보에 접근할 수도 있다.
+
+| PSR register combination | type | combination |
+| :---: | :---: | :---: |
+| PSR | read-write | APSR, EPSR, IPSR |
+| IEPSR | read-only | IPSR, EPSR |
+| IAPSR | read-write | APSR, IPSR |
+| EAPSR | reat-write | APSR, EPSR |
+
+---
+
+### 4.2.2 Exception Mask Registers
+
+**Exception Mask Registers**는 exception 발생 시, interrupt를 mask할 수 있는 register이다.
+
+> 따라서 실행 시간이 중요한 task를 처리할 때 유용하게 사용할 수 있다.
+
+PRIMASK, FAULTMASK, BASEPRI가 있다.
+
+- **PRIMASK**
+
+  ![PRIMASK](images/PRIMASK.png)
+
+  Priority Mask Register의 줄임말로, PRIMASK의 bit[0]이 1이면 <U>interrupt를 mask</U>하고, 0이면 interrupt를 mask하지 않는다.
+
+- **FAULTMASK**
+
+  ![FAULTMASK](images/FAULTMASK.png)
+
+  Fault Mask Register의 줄임말로, FAULTMASK의 bit[0]이 1이면 <U>fault를 mask</U>하고, 0이면 fault를 mask하지 않는다.
+
+  > <U>NMI(Non-Maskable Interrupt)를 제외한 exception의 처리를 mask</U>한다.
+
+- **BASEPRI**
+
+  ![BASEPRI](images/BASEPRI.png)
+
+  Base Priority Register의 줄임말로, BASEPRI의 bit[7:0]은 <U>interrupt priority를 mask</U>한다. 즉, BASEPRI의 bit[7:0]보다 낮은 **priority**를 가진 interrupt는 발생하지 않는다.
+
+  > exception의 처리의 최소 priority(우선 순위)를 관리하는 것이다.
+
+---
+
+### 4.2.3 Control Register
+
+**Control Register**는 processor의 동작을 제어하는 register이다.
+
+- privilege level을 결정한다.(unprivileged, privileged)
+
+- stack pointer를 결정한다.(main stack, process stack)
+
+- FPU(Floating Point Unit) 사용 여부를 결정한다.(사용, 사용하지 않음)
+
+---
+
+## 4.3 event 처리
 
 > [Interrupt](https://xmctutorial.readthedocs.io/ko/stable/Interrupt/index.html)
 
@@ -36,7 +179,7 @@ interrupt가 바로 CPU에서 수행하던 일련의 작업을 중단하고, eve
 
 ---
 
-### 4.1.1 polling
+### 4.3.1 polling
 
 사용자가 button을 누르는 간단한 Event-triggered 동작을 생각해 보자. event가 발생한 것을 어떻게 확인하고 처리할 수 있을까?
 
@@ -60,7 +203,7 @@ interrupt가 바로 CPU에서 수행하던 일련의 작업을 중단하고, eve
 
 ---
 
-### 4.1.2 interrupt
+### 4.3.2 interrupt
 
 그러면 polling 방식의 대안으로 interrupt를 살펴보자. interrupt를 전화로 비유할 수 있다.
 
@@ -112,13 +255,15 @@ program을 중단하고 interrupt를 처리하는 것을 **context switch**라�
 
 ---
 
-## 4.1.3 IVT(Interrupt Vector Table)
+## 4.4 IVT(Interrupt Vector Table)
 
 **IVT**(Interrupt Vector Table)은 interrupt를 처리하기 위한 handler function인 **ISR**(Interrupt Service Routine) pointer가 모인 array이다. 
 
 **Interrupt Handler**(인터럽트 핸들러)라는 명칭으로도 불리며, device driver에서 요구하는 일을 처리하는 기능적 code set으로 callback routine으로 처리된다.
 
-IVT는 주로 binary image 시작 부분에 기술되고, flash memory의 base address에 저장된다.(아래 그림의 0x08000000에 해당된다.)
+IVT는 주로 binary image 시작 부분에 기술되고, flash memory의 base address에 저장된다.
+
+아래 그림을 보자. RAM(8kB)와 flash(64kB)의 memory mapping을 나타낸 그림이다. IVT는 flash의 base address인 0x08000000에 저장되어 있다.
 
 ![IVT section](images/flash_memory_map.jpeg)
 
