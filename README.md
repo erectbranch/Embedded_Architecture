@@ -39,6 +39,14 @@
 
    > Linker: symbol(.text/.rodata/.data/.bss), linker script, symbol resolution, relocation, ROF/EOF, object file format
 
+ - [서브시스템과 인터럽트](https://github.com/erectbranch/Embedded_Architecture/tree/master/ch04)
+
+   > CPSR(User/FIQ/IRQ/SVC/Abort/Undefined/System), processor mode(thread/handler), privilige levels(priviliged/unpriviliged)
+
+   > core register: general purpose register, stack pointer, link register, program counter) PSR, EMR, CONTROL
+
+   > polling, interrupt, IVT(Interrupt Vector Table), ISR(Interrupt Service Routine)
+
 <br/>
 
 ### 1장. 임베디드 시스템: 실용주의적 접근
