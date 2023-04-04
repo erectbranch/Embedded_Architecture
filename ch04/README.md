@@ -283,12 +283,68 @@ ARM Cortex-M에서 정의한 system interrupt의 종류는 다음과 같은 것�
 
 - usage fault
 
-- supervisor call(schedular)
+- supervisor call(scheduler)
 
 - **debug monitor**(breakpoint)
 
 - PendSV(Shared resource, **Semaphone** ...)
 
 - **System tick**(timer)
+
+---
+
+## 4.5 memory layout
+
+linker script의 `.text`에는 제일 먼저 IVT와 관련된 부분이 들어간다.
+
+```
+.text : {
+    *(.isr_vector),
+    *(.text),
+    *(.rodata)
+} > FLASH	// Flash에 할당되는 읽기전용 내용들
+```
+
+system이 bootup하기 위해서는 먼저 IVT가 실행되고, 'reset handler' function이 실행되어야 한다. reset handler가 `.bss`, `.data` section에 정의된 symbol들이 초기화시킨다.
+
+따라서 `.text` 최상단에 `.isr_vector` pointer가 들어간 것을 확인할 수 있다. 이 내용이 flash에 RO(Read Only)로 기록된다.
+
+---
+
+## 4.6 시작 코드
+
+boot 과정의 첫 단계는 IVT를 정의하고, pointer를 연결하는 것이다. GCC의 attribute인 `section`을 사용해서 IVT를 정의한다.
+
+```cpp
+__attribute__ ((section(".isr_vector")))
+void (* const IV[])(void) {
+    (void (*)(void))(END_STACK),	// Stack pointer 초기값 지정
+    isr_reset,
+    isr_nmi,
+    ...
+}
+// ISR은 parameter도 return도 없다.
+void isr_reset(void) {
+    /*...구현...*/
+    while(1) {}
+}
+// 사용자 정의 ISR 또는 빈 ISR은 오버라이드 될 수 있도록 __weak 심볼을 사용한다.
+void isr_user(void)__weak {
+    /*...구현...*/
+    while(1) {}
+}
+```
+
+MCU에 전원이 들어오면 바로 reset exception이 발생한다. (ARM core에서는 바로 **SVC** mode로 진입하게 된다.) 그리고 IVT 상단에 정의된 reset handler의 address를 찾아서 실행한다.
+
+Reset handler는 다음과 같은 작업을 수행해 준다.
+
+- `.data`와 `.bss` section의 symbol들을 초기화한다.(`.bss` section은 특성상 0으로 초기화된다.)
+
+- `.data`와 `.bss` section을 RAM의 실제 section에 복사한다. 이 작업이 끝나면 main() function을 호출할 수 있다.
+
+MCU는 MMU가 없기 때문에 모두 physical address로 동작하지만, linker script는 VMA(Virtual Memory Address)와 LMA(Load Memory Address)를 분리하는 메커니즘을 제공한다. 이를 통해 `.data`와 `.bss` section을 flash에 저장하고, RAM에 복사하는 작업을 수행할 수 있다.
+
+> flash에 정의된 `.data`의 address들이 RAM의 어느 부분에 저장될지 compile time에는 결정할 수 없다. 따라서 linker script에서 `.data` section의 address를 정의할 수 있게 만들어야 한다.
 
 ---
